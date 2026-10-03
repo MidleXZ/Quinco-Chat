@@ -1,0 +1,111 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.1.0' }}
+
+jobs:
+  linux:
+    name: Linux AppImage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test
+        run: make -C server BUILD_DIR=build/release all test
+
+      - name: Package AppImage
+        run: |
+          appdir=server/build/release/AppDir
+          mkdir -p "$appdir/usr/bin" "$appdir/usr/share/icons/hicolor/scalable/apps" server/build/release/dist
+          cp server/build/release/quinco-chat-server "$appdir/usr/bin/"
+          cp server/packaging/linux/AppRun "$appdir/"
+          cp server/packaging/linux/quinco-chat.desktop "$appdir/"
+          cp server/packaging/linux/quinco-chat.svg "$appdir/"
+          cp server/packaging/linux/quinco-chat.svg "$appdir/usr/share/icons/hicolor/scalable/apps/"
+          chmod +x "$appdir/AppRun"
+          curl -L --fail --silent --show-error \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+          ARCH=x86_64 VERSION="$APP_VERSION" /tmp/appimagetool --appimage-extract-and-run \
+            "$appdir" "server/build/release/dist/QuincoChat.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuincoChat-Linux-AppImage
+          path: server/build/release/dist/QuincoChat.AppImage
+          if-no-files-found: error
+
+  macos:
+    name: macOS setup package
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test universal binary
+        run: >-
+          make -C server BUILD_DIR=build/release CXX=clang++
+          CXXFLAGS="-std=c++20 -Wall -Wextra -Wpedantic -O2 -arch arm64
+          -arch x86_64 -mmacosx-version-min=11.0" all test
+
+      - name: Package installer
+        run: |
+          mkdir -p server/build/release/pkgroot/usr/local/bin server/build/release/dist
+          cp server/build/release/quinco-chat-server server/build/release/pkgroot/usr/local/bin/
+          pkgbuild \
+            --root server/build/release/pkgroot \
+            --identifier com.midlxz.quinco-chat-server \
+            --version "$APP_VERSION" \
+            --install-location / \
+            server/build/release/dist/QuincoChat-setup.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuincoChat-macOS-setup
+          path: server/build/release/dist/QuincoChat-setup.pkg
+          if-no-files-found: error
+
+  windows:
+    name: Windows setup executable
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+
+      - name: Build and test
+        shell: msys2 {0}
+        run: >-
+          make -C server BUILD_DIR=build/release CXX=g++
+          CXXFLAGS="-std=c++20 -Wall -Wextra -Wpedantic -O2 -static
+          -static-libgcc -static-libstdc++" all test
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Package installer
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force server/build/release/dist | Out-Null
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc "/DAppVersion=$env:APP_VERSION" 'server/packaging/windows/QuincoChat.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuincoChat-Windows-setup
+          path: server/build/release/dist/QuincoChat-setup.exe
+          if-no-files-found: error
