@@ -4,5 +4,5 @@ Name=Quinco Chat Server
 Comment=Run the Quinco Chat server
 Exec=AppRun
 Icon=quinco-chat
-Terminal=true
+Terminal=false
 Categories=Network;Chat;

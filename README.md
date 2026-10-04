@@ -18,6 +18,11 @@ Options:
 ./build/quinco-chat-server --host 0.0.0.0 --port 9000 --data ./data --web ./public
 ```
 
+Pass `--open-browser` to launch the UI in a separate browser app window when
+the server starts. Packaged Linux, macOS, and Windows launchers enable this
+automatically. Chromium-based browsers use app mode; otherwise the system
+default browser is opened.
+
 Open `http://127.0.0.1:8080` for the HTML sign-in and account-creation UI.
 `GET /health` returns a JSON health response. The WebSocket endpoint is `/ws`.
 The server supports registration, login, session resume, direct conversations,

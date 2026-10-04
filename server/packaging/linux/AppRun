@@ -3,4 +3,4 @@ HERE="$(dirname "$(readlink -f "$0")")"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 exec "$HERE/usr/bin/quinco-chat-server" \
 	--web "$HERE/usr/share/quinco-chat/public" \
-	--data "$DATA_HOME/quinco-chat" "$@"
+	--data "$DATA_HOME/quinco-chat" --open-browser "$@"

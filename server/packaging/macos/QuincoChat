@@ -1,0 +1,5 @@
+#!/bin/sh
+DATA_HOME="$HOME/Library/Application Support/Quinco Chat"
+exec /usr/local/bin/quinco-chat-server \
+  --web /usr/local/share/quinco-chat/public \
+  --data "$DATA_HOME" --open-browser "$@"

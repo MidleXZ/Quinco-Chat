@@ -5,7 +5,7 @@ EXE_SUFFIX ?=
 LDLIBS ?=
 ifeq ($(OS),Windows_NT)
 EXE_SUFFIX := .exe
-LDLIBS += -lws2_32 -lbcrypt
+LDLIBS += -lws2_32 -lbcrypt -lshell32
 endif
 SERVER_BIN := $(BUILD_DIR)/quinco-chat-server$(EXE_SUFFIX)
 TEST_BIN := $(BUILD_DIR)/self_test$(EXE_SUFFIX)

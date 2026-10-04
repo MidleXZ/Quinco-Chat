@@ -25,4 +25,4 @@ Source: "..\..\public\*"; DestDir: "{app}\public"; Flags: ignoreversion recurses
 Name: "{userappdata}\Quinco Chat Server"
 
 [Icons]
-Name: "{group}\Quinco Chat Server"; Filename: "{app}\quinco-chat-server.exe"; Parameters: "--data ""{userappdata}\Quinco Chat Server\data"""; WorkingDir: "{userappdata}\Quinco Chat Server"
+Name: "{group}\Quinco Chat Server"; Filename: "{app}\quinco-chat-server.exe"; Parameters: "--open-browser --data ""{userappdata}\Quinco Chat Server\data"""; WorkingDir: "{userappdata}\Quinco Chat Server"; Flags: runminimized

@@ -17,12 +17,16 @@
 #define NOMINMAX
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
+#include <shellapi.h>
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <spawn.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+extern char** environ;
 #endif
 
 #include "http.h"
@@ -293,6 +297,137 @@ bool parsePort(const std::string& text, uint16_t& port) {
   return true;
 }
 
+#if defined(_WIN32)
+std::wstring widen(const std::string& text) {
+  if (text.empty()) return {};
+  const int size = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+  if (size <= 0) return {};
+  std::wstring result(static_cast<size_t>(size), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, result.data(), size);
+  result.pop_back();
+  return result;
+}
+
+bool launchWindowsBrowser(const std::string& url) {
+  const std::wstring wideUrl = widen(url);
+  std::vector<std::filesystem::path> candidates;
+  for (const wchar_t* variable : {L"ProgramFiles", L"ProgramFiles(x86)",
+                                  L"LOCALAPPDATA"}) {
+    wchar_t value[32768];
+    const DWORD length = GetEnvironmentVariableW(variable, value,
+                                                  32768);
+    if (length == 0 || length >= 32768) continue;
+    const std::filesystem::path base(value);
+    candidates.push_back(base / L"Google/Chrome/Application/chrome.exe");
+    candidates.push_back(base / L"Microsoft/Edge/Application/msedge.exe");
+  }
+
+  wchar_t localAppData[32768];
+  const DWORD localAppDataLength =
+      GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, 32768);
+  std::wstring browserProfile;
+  if (localAppDataLength > 0 && localAppDataLength < 32768) {
+    const std::filesystem::path profile =
+        std::filesystem::path(localAppData) / L"Quinco Chat" / L"Browser Profile";
+    std::error_code error;
+    std::filesystem::create_directories(profile, error);
+    if (!error) browserProfile = profile.wstring();
+  }
+
+  for (const std::filesystem::path& browser : candidates) {
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(browser, error) || error) continue;
+    std::wstring command = L"\"" + browser.wstring() +
+                           L"\" --no-first-run --new-window";
+    if (!browserProfile.empty()) {
+      command += L" --user-data-dir=\"" + browserProfile + L"\"";
+    }
+    command += L" --app=\"" + wideUrl + L"\"";
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (CreateProcessW(browser.c_str(), command.data(), nullptr, nullptr, FALSE,
+                       CREATE_NEW_PROCESS_GROUP, nullptr, nullptr, &startup,
+                       &process)) {
+      CloseHandle(process.hThread);
+      CloseHandle(process.hProcess);
+      return true;
+    }
+  }
+
+  return reinterpret_cast<intptr_t>(ShellExecuteW(
+             nullptr, L"open", wideUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+}
+#else
+bool spawnProgram(const std::string& program,
+                  std::vector<std::string> arguments) {
+  std::vector<char*> rawArguments;
+  rawArguments.reserve(arguments.size() + 1);
+  for (std::string& argument : arguments) rawArguments.push_back(argument.data());
+  rawArguments.push_back(nullptr);
+  pid_t process = 0;
+  return posix_spawnp(&process, program.c_str(), nullptr, nullptr,
+                      rawArguments.data(), environ) == 0;
+}
+
+#if !defined(__APPLE__)
+std::string linuxBrowserProfile() {
+  const char* configHome = std::getenv("XDG_CONFIG_HOME");
+  const char* home = std::getenv("HOME");
+  std::filesystem::path base = configHome && *configHome
+                                   ? std::filesystem::path(configHome)
+                                   : home && *home
+                                         ? std::filesystem::path(home) / ".config"
+                                         : std::filesystem::temp_directory_path();
+  const std::filesystem::path profile =
+      base / "quinco-chat" / "browser-profile";
+  std::error_code error;
+  std::filesystem::create_directories(profile, error);
+  return error ? std::string() : profile.string();
+}
+#endif
+
+bool launchUnixBrowser(const std::string& url) {
+#if defined(__APPLE__)
+  const char* home = std::getenv("HOME");
+  const std::filesystem::path profile = home && *home
+      ? std::filesystem::path(home) / "Library/Application Support/Quinco Chat/Browser Profile"
+      : std::filesystem::temp_directory_path() / "quinco-chat-browser-profile";
+  std::error_code error;
+  std::filesystem::create_directories(profile, error);
+  if (!error && spawnProgram("open", {"open", "-na", "Google Chrome", "--args",
+                                       "--no-first-run", "--user-data-dir=" +
+                                           profile.string(), "--app=" + url})) {
+    return true;
+  }
+  return spawnProgram("open", {"open", url});
+#else
+  const std::string profile = linuxBrowserProfile();
+  for (const char* browser : {"google-chrome", "google-chrome-stable",
+                              "chromium", "chromium-browser"}) {
+    std::vector<std::string> arguments = {
+        browser, "--no-first-run", "--no-default-browser-check", "--new-window"};
+    if (!profile.empty()) arguments.push_back("--user-data-dir=" + profile);
+    arguments.push_back("--app=" + url);
+    if (spawnProgram(browser, std::move(arguments))) {
+      return true;
+    }
+  }
+  return spawnProgram("xdg-open", {"xdg-open", url});
+#endif
+}
+#endif
+
+bool launchBrowserWindow(const std::string& host, uint16_t port) {
+  const std::string browserHost = host == "0.0.0.0" ? "127.0.0.1" : host;
+  const std::string url = "http://" + browserHost + ':' + std::to_string(port);
+#if defined(_WIN32)
+  return launchWindowsBrowser(url);
+#else
+  return launchUnixBrowser(url);
+#endif
+}
+
 std::string defaultWebDirectory(const char* executablePath) {
   const char* appDirectory = std::getenv("APPDIR");
   if (appDirectory && *appDirectory) {
@@ -331,12 +466,17 @@ int main(int argc, char** argv) {
   uint16_t port = 8080;
   std::string dataDirectory = "data";
   std::string webDirectory = defaultWebDirectory(argv[0]);
+  bool openBrowser = false;
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "--help" || argument == "-h") {
       std::cout << "Usage: quinco-chat-server [--host ADDRESS] [--port PORT] "
-                   "[--data DIR] [--web DIR]\n";
+                   "[--data DIR] [--web DIR] [--open-browser]\n";
       return 0;
+    }
+    if (argument == "--open-browser") {
+      openBrowser = true;
+      continue;
     }
     if (index + 1 >= argc) {
       std::cerr << "Missing value for " << argument << '\n';
@@ -415,6 +555,10 @@ int main(int argc, char** argv) {
   std::cout << "Quinco Chat listening on http://" << host << ':' << port
             << " (WebSocket: /ws, health: /health)\n";
   std::cout << "Serving web files from " << webDirectory << '\n';
+  if (openBrowser && !launchBrowserWindow(host, port)) {
+    std::cerr << "Could not open a browser window; visit http://127.0.0.1:"
+              << port << '\n';
+  }
   while (!g_stopping) {
     fd_set readable;
     FD_ZERO(&readable);

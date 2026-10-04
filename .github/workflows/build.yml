@@ -69,11 +69,17 @@ jobs:
           mkdir -p server/build/release/pkgroot/usr/local/bin \
             server/build/release/pkgroot/usr/local/share/quinco-chat/public \
             server/build/release/dist
+          app_bundle="server/build/release/pkgroot/Applications/Quinco Chat.app/Contents"
+          mkdir -p "$app_bundle/MacOS"
           cp server/build/release/quinco-chat-server server/build/release/pkgroot/usr/local/bin/
           cp server/public/index.html \
             server/build/release/pkgroot/usr/local/share/quinco-chat/public/
           cp server/public/app.js \
             server/build/release/pkgroot/usr/local/share/quinco-chat/public/
+          cp server/packaging/macos/QuincoChat "$app_bundle/MacOS/QuincoChat"
+          cp server/packaging/macos/Info.plist "$app_bundle/Info.plist"
+          printf 'APPL????' > "$app_bundle/PkgInfo"
+          chmod +x "$app_bundle/MacOS/QuincoChat"
           pkgbuild \
             --root server/build/release/pkgroot \
             --identifier com.midlxz.quinco-chat-server \
