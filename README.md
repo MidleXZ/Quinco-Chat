@@ -40,5 +40,10 @@ downloadable workflow artifact:
 - macOS: `QuincoChat-setup.pkg` (universal arm64 and x86_64 binary)
 - Windows: `QuincoChat-setup.exe` (64-bit installer)
 
+The Actions artifact is a ZIP. After extracting it, either restore the raw
+AppImage's executable bit with `chmod +x QuincoChat.AppImage`, or extract
+`QuincoChat.AppImage.tar.gz` to preserve its permissions. Then run
+`./QuincoChat.AppImage`.
+
 The installers package the server executable. They do not include a browser
 client bundle because one is not present in this source tree.
