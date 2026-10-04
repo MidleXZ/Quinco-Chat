@@ -70,16 +70,11 @@
     }
 
     .brand-mark {
-      display: grid;
+      display: block;
       width: 34px;
       height: 34px;
-      place-items: center;
-      border-radius: 11px 11px 11px 3px;
-      color: var(--pine);
-      background: var(--lime);
-      font-family: Georgia, serif;
-      font-size: 20px;
-      font-weight: 700;
+      flex: 0 0 34px;
+      object-fit: contain;
     }
 
     .welcome-copy {
@@ -549,16 +544,11 @@
     .welcome-state-inner { width: min(100%, 570px); animation: enter 500ms ease-out both; }
 
     .state-mark {
-      display: grid;
-      width: 52px;
-      height: 52px;
+      display: block;
+      width: 58px;
+      height: 58px;
       margin-bottom: 25px;
-      place-items: center;
-      border-radius: 16px 16px 16px 5px;
-      color: var(--pine);
-      background: var(--lime);
-      font-family: Georgia, serif;
-      font-size: 28px;
+      object-fit: contain;
     }
 
     .welcome-state h1 {
@@ -794,7 +784,7 @@
 <body>
   <main id="auth-view" class="auth-layout">
     <section class="welcome-panel" aria-label="Quinco Chat">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">q</span><span>Quinco Chat</span></div>
+      <div class="brand"><img class="brand-mark" src="/logo.svg" alt=""><span>Quinco Chat</span></div>
       <div class="welcome-copy">
         <p class="kicker">Good conversations, kept close</p>
         <h1>A little more room to be heard.</h1>
@@ -810,7 +800,7 @@
 
     <section class="auth-panel" aria-labelledby="auth-title">
       <div class="auth-card">
-        <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">q</span><span>Quinco Chat</span></div>
+        <div class="brand mobile-brand"><img class="brand-mark" src="/logo.svg" alt=""><span>Quinco Chat</span></div>
         <div id="connection" class="connection" data-state="connecting" role="status">
           <span class="connection-dot" aria-hidden="true"></span>
           <span id="connection-text">Connecting to your server</span>
@@ -849,7 +839,7 @@
 
   <div id="workspace" class="workspace" hidden>
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">q</span><span class="brand-name">Quinco</span></div>
+      <div class="brand"><img class="brand-mark" src="/logo.svg" alt=""><span class="brand-name">Quinco</span></div>
       <p class="side-label">Workspace</p>
       <div class="nav-item active" aria-current="page"><span class="nav-glyph" aria-hidden="true">&#9673;</span><span class="nav-text">Messages</span></div>
       <div class="room-actions">
@@ -884,7 +874,7 @@
       </header>
       <section id="welcome-state" class="welcome-state" aria-labelledby="workspace-heading">
         <div class="welcome-state-inner">
-          <div class="state-mark" aria-hidden="true">q</div>
+          <img class="state-mark" src="/logo.svg" alt="Quinco Chat">
           <p class="kicker" style="color:#57796c">Your space</p>
           <h1 id="workspace-heading">You’re in, <span id="welcome-name">friend</span>.</h1>
           <p>Start a conversation with someone or make a room for your group.</p>

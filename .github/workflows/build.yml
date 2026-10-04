@@ -30,6 +30,7 @@ jobs:
           cp server/build/release/quinco-chat-server "$appdir/usr/bin/"
           cp server/public/index.html "$appdir/usr/share/quinco-chat/public/"
           cp server/public/app.js "$appdir/usr/share/quinco-chat/public/"
+          cp server/other/logo.svg "$appdir/usr/share/quinco-chat/public/"
           cp server/packaging/linux/AppRun "$appdir/"
           cp server/packaging/linux/quinco-chat.desktop "$appdir/"
           cp server/packaging/linux/quinco-chat.svg "$appdir/"
@@ -75,6 +76,8 @@ jobs:
           cp server/public/index.html \
             server/build/release/pkgroot/usr/local/share/quinco-chat/public/
           cp server/public/app.js \
+            server/build/release/pkgroot/usr/local/share/quinco-chat/public/
+          cp server/other/logo.svg \
             server/build/release/pkgroot/usr/local/share/quinco-chat/public/
           cp server/packaging/macos/QuincoChat "$app_bundle/MacOS/QuincoChat"
           cp server/packaging/macos/Info.plist "$app_bundle/Info.plist"
