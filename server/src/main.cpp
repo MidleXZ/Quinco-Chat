@@ -467,6 +467,7 @@ int main(int argc, char** argv) {
   std::string dataDirectory = "data";
   std::string webDirectory = defaultWebDirectory(argv[0]);
   bool openBrowser = false;
+  bool portSpecified = false;
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "--help" || argument == "-h") {
@@ -490,6 +491,7 @@ int main(int argc, char** argv) {
         std::cerr << "Invalid port: " << value << '\n';
         return 2;
       }
+      portSpecified = true;
     } else if (argument == "--data") {
       dataDirectory = value;
     } else if (argument == "--web") {
@@ -539,10 +541,27 @@ int main(int argc, char** argv) {
   sockaddr_in address{};
   address.sin_family = AF_INET;
   address.sin_port = htons(port);
-  if (::inet_pton(AF_INET, host.c_str(), &address.sin_addr) != 1 ||
-      ::bind(listener, reinterpret_cast<sockaddr*>(&address),
-             static_cast<SocketLength>(sizeof(address))) < 0 ||
-      ::listen(listener, 128) < 0) {
+  if (::inet_pton(AF_INET, host.c_str(), &address.sin_addr) != 1) {
+    std::cerr << "Could not listen on " << host << ':' << port << '\n';
+    closeSocket(listener);
+    return 1;
+  }
+
+  bool bound = ::bind(listener, reinterpret_cast<sockaddr*>(&address),
+                      static_cast<SocketLength>(sizeof(address))) == 0;
+  if (!bound && openBrowser && !portSpecified && port == 8080) {
+    for (uint16_t candidate = 8081; candidate <= 8099; ++candidate) {
+      address.sin_port = htons(candidate);
+      if (::bind(listener, reinterpret_cast<sockaddr*>(&address),
+                 static_cast<SocketLength>(sizeof(address))) == 0) {
+        port = candidate;
+        bound = true;
+        std::cerr << "Port 8080 is busy; using port " << port << '\n';
+        break;
+      }
+    }
+  }
+  if (!bound || ::listen(listener, 128) < 0) {
     std::cerr << "Could not listen on " << host << ':' << port << '\n';
     closeSocket(listener);
     return 1;
