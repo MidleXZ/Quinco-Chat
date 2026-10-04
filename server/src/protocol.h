@@ -38,6 +38,8 @@ class Protocol {
   void sendError(ClientLink* link, const std::string& message,
                  const std::string& code = std::string());
   void sendRooms(ClientLink* link, const std::string& userId);
+  void sendRoomLists(const std::string& roomId,
+                     const std::vector<std::string>& extraUsers = {});
   void broadcastPresence();
 
   // Fills `userId` from the link's binding. Replies and returns false when

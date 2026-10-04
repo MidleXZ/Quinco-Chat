@@ -19,6 +19,7 @@ WizardStyle=modern
 
 [Files]
 Source: "..\..\build\release\quinco-chat-server.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\public\*"; DestDir: "{app}\public"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{userappdata}\Quinco Chat Server"

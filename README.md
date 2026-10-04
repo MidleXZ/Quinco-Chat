@@ -18,10 +18,13 @@ Options:
 ./build/quinco-chat-server --host 0.0.0.0 --port 9000 --data ./data --web ./public
 ```
 
+Open `http://127.0.0.1:8080` for the HTML sign-in and account-creation UI.
 `GET /health` returns a JSON health response. The WebSocket endpoint is `/ws`.
-Static client files are served from `public/` (or the path passed with `--web`);
-this source tree does not include a client bundle. The currently implemented
-WebSocket messages are `register`, `login`, `resume`, and `logout`.
+The server supports registration, login, session resume, direct conversations,
+public rooms, persistent message history, and text messaging. Audio and video
+calls use browser WebRTC, so the browser needs microphone/camera permission.
+Remote access requires HTTPS for media permissions; localhost is allowed over
+HTTP by browsers.
 
 Run the foundation tests with:
 
@@ -45,5 +48,6 @@ AppImage's executable bit with `chmod +x QuincoChat.AppImage`, or extract
 `QuincoChat.AppImage.tar.gz` to preserve its permissions. Then run
 `./QuincoChat.AppImage`.
 
-The installers package the server executable. They do not include a browser
-client bundle because one is not present in this source tree.
+The installers include the server executable and HTML client. Calls include a
+public STUN server for connection negotiation; networks that block direct
+peer-to-peer traffic may require a TURN relay.

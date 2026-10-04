@@ -25,8 +25,11 @@ jobs:
       - name: Package AppImage
         run: |
           appdir=server/build/release/AppDir
-          mkdir -p "$appdir/usr/bin" "$appdir/usr/share/icons/hicolor/scalable/apps" server/build/release/dist
+          mkdir -p "$appdir/usr/bin" "$appdir/usr/share/icons/hicolor/scalable/apps" \
+            "$appdir/usr/share/quinco-chat/public" server/build/release/dist
           cp server/build/release/quinco-chat-server "$appdir/usr/bin/"
+          cp server/public/index.html "$appdir/usr/share/quinco-chat/public/"
+          cp server/public/app.js "$appdir/usr/share/quinco-chat/public/"
           cp server/packaging/linux/AppRun "$appdir/"
           cp server/packaging/linux/quinco-chat.desktop "$appdir/"
           cp server/packaging/linux/quinco-chat.svg "$appdir/"
@@ -63,8 +66,14 @@ jobs:
 
       - name: Package installer
         run: |
-          mkdir -p server/build/release/pkgroot/usr/local/bin server/build/release/dist
+          mkdir -p server/build/release/pkgroot/usr/local/bin \
+            server/build/release/pkgroot/usr/local/share/quinco-chat/public \
+            server/build/release/dist
           cp server/build/release/quinco-chat-server server/build/release/pkgroot/usr/local/bin/
+          cp server/public/index.html \
+            server/build/release/pkgroot/usr/local/share/quinco-chat/public/
+          cp server/public/app.js \
+            server/build/release/pkgroot/usr/local/share/quinco-chat/public/
           pkgbuild \
             --root server/build/release/pkgroot \
             --identifier com.midlxz.quinco-chat-server \

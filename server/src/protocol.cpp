@@ -100,6 +100,23 @@ void Protocol::sendRooms(ClientLink* link, const std::string& userId) {
   link->send(payload);
 }
 
+void Protocol::sendRoomLists(const std::string& roomId,
+                             const std::vector<std::string>& extraUsers) {
+  std::set<std::string> userIds;
+  for (const std::string& userId : store_.roomMembers(roomId)) {
+    userIds.insert(userId);
+  }
+  for (const std::string& userId : extraUsers) {
+    if (!userId.empty()) userIds.insert(userId);
+  }
+  for (const std::string& userId : userIds) {
+    json::Value payload = makeObject();
+    payload.set("t", json::Value("rooms"));
+    payload.set("rooms", buildRoomList(userId));
+    hub_.sendToUser(userId, payload);
+  }
+}
+
 json::Value Protocol::directoryPayload(const std::string& viewerId,
                                        const std::string& query) const {
   const std::vector<User> users =
@@ -108,8 +125,15 @@ json::Value Protocol::directoryPayload(const std::string& viewerId,
   json::Value list = json::Value::array();
   for (const User& user : users) list.push(userToJson(user));
 
+  json::Value publicRooms = json::Value::array();
+  for (const Room& room : store_.publicRooms(viewerId, kDirectoryLimit)) {
+    publicRooms.push(roomToJson(room, store_.lastActivity(room.id),
+                                room.members.size()));
+  }
+
   json::Value payload = makeObject();
   payload.set("users", std::move(list));
+  payload.set("rooms", std::move(publicRooms));
   payload.set("online", stringArray(hub_.onlineUsers()));
   payload.set("query", json::Value(query));
   return payload;
@@ -234,6 +258,370 @@ void Protocol::handleLogout(ClientLink* link, const json::Value& message) {
   link->closeLink();
 }
 
+void Protocol::handleBootstrap(ClientLink* link, const json::Value&) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+
+  User user;
+  if (!store_.findUser(userId, user)) {
+    sendError(link, "That account no longer exists.", "account_missing");
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("bootstrap"));
+  payload.set("user", userToJson(user));
+  payload.set("rooms", buildRoomList(userId));
+  payload.set("directory", directoryPayload(userId, std::string()));
+  link->send(payload);
+}
+
+void Protocol::handleDirectory(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+
+  json::Value payload = directoryPayload(userId, message["query"].asString());
+  payload.set("t", json::Value("directory"));
+  link->send(payload);
+}
+
+void Protocol::handleProfileUpdate(ClientLink* link,
+                                   const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+
+  User current;
+  if (!store_.findUser(userId, current)) {
+    sendError(link, "That account no longer exists.", "account_missing");
+    return;
+  }
+  std::string error;
+  const std::string displayName = message.has("displayName")
+                                      ? message["displayName"].asString()
+                                      : current.displayName;
+  const std::string tagline = message.has("tagline")
+                                  ? message["tagline"].asString()
+                                  : current.tagline;
+  const int64_t rawHue = message.has("avatarHue")
+                             ? message["avatarHue"].asInt(current.avatarHue)
+                             : current.avatarHue;
+  const int32_t hue = static_cast<int32_t>(rawHue % 360);
+  if (!store_.updateProfile(userId, displayName, tagline, hue, error)) {
+    sendError(link, error);
+    return;
+  }
+
+  User updated;
+  store_.findUser(userId, updated);
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("profile_updated"));
+  payload.set("user", userToJson(updated));
+  link->send(payload);
+  const std::set<std::string> onlineSet = hub_.onlineUsers();
+  const std::vector<std::string> online(onlineSet.begin(), onlineSet.end());
+  hub_.sendToUsers(online, payload, userId);
+}
+
+void Protocol::handleRoomCreate(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+
+  std::vector<std::string> extraMembers;
+  const json::Value& memberIds = message["memberIds"];
+  if (memberIds.isArray()) {
+    for (const json::Value& memberId : memberIds.asArray()) {
+      if (!memberId.asString().empty()) extraMembers.push_back(memberId.asString());
+      if (extraMembers.size() >= kMaxRoomMembers) break;
+    }
+  }
+  const Store::RoomOutcome outcome = store_.createRoom(
+      message["name"].asString(), userId, extraMembers);
+  if (!outcome.ok) {
+    sendError(link, outcome.error);
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("room_created"));
+  payload.set("room", roomToJson(outcome.room,
+                                 store_.lastActivity(outcome.room.id),
+                                 outcome.room.members.size()));
+  link->send(payload);
+  sendRoomLists(outcome.room.id);
+}
+
+void Protocol::handleRoomOpenDirect(ClientLink* link,
+                                    const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+
+  const std::string username = message["username"].asString();
+  const Store::RoomOutcome outcome =
+      store_.openOrCreateDirectRoomByName(userId, username);
+  if (!outcome.ok) {
+    sendError(link, outcome.error);
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("room_opened"));
+  payload.set("room", roomToJson(outcome.room,
+                                 store_.lastActivity(outcome.room.id),
+                                 outcome.room.members.size()));
+  link->send(payload);
+  sendRoomLists(outcome.room.id);
+}
+
+void Protocol::handleRoomJoin(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string roomId = message["roomId"].asString();
+  Room room;
+  if (!store_.findRoom(roomId, room) || room.direct ||
+      !store_.joinRoom(roomId, userId)) {
+    sendError(link, "That room cannot be joined.", "room_unavailable");
+    return;
+  }
+  store_.findRoom(roomId, room);
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("room_joined"));
+  payload.set("room", roomToJson(room, store_.lastActivity(room.id),
+                   store_.roomMembers(roomId).size()));
+  link->send(payload);
+  sendRoomLists(roomId);
+
+  User user;
+  if (store_.findUser(userId, user)) {
+    json::Value notice = makeObject();
+    notice.set("t", json::Value("member_joined"));
+    notice.set("roomId", json::Value(roomId));
+    notice.set("user", userToJson(user));
+    hub_.sendToUsers(store_.roomMembers(roomId), notice, userId);
+  }
+}
+
+void Protocol::handleRoomLeave(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string roomId = message["roomId"].asString();
+  std::string error;
+  if (!store_.leaveRoom(roomId, userId, error)) {
+    sendError(link, error);
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("room_left"));
+  payload.set("roomId", json::Value(roomId));
+  link->send(payload);
+  sendRoomLists(roomId, {userId});
+}
+
+void Protocol::handleHistory(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string roomId = message["roomId"].asString();
+  if (!requireRoomMember(link, userId, roomId)) return;
+
+  const int64_t before = message["before"].asInt();
+  int64_t requestedLimit = message["limit"].asInt(kHistoryPageSize);
+  if (requestedLimit < 1) requestedLimit = 1;
+  if (requestedLimit > static_cast<int64_t>(kMaxHistoryPageSize)) {
+    requestedLimit = static_cast<int64_t>(kMaxHistoryPageSize);
+  }
+  const std::vector<Message> messages = store_.messages(
+      roomId, before, static_cast<size_t>(requestedLimit));
+  json::Value list = json::Value::array();
+  for (const Message& item : messages) list.push(messageToJson(item));
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("history"));
+  payload.set("roomId", json::Value(roomId));
+  payload.set("messages", std::move(list));
+  payload.set("hasMore", json::Value(messages.size() ==
+                                      static_cast<size_t>(requestedLimit)));
+  link->send(payload);
+}
+
+void Protocol::handleMessageSend(ClientLink* link,
+                                 const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string roomId = message["roomId"].asString();
+  if (!requireRoomMember(link, userId, roomId)) return;
+
+  std::string attachmentError;
+  const Attachment attachment =
+      attachmentFromMessage(message["attachment"], attachmentError);
+  if (!attachmentError.empty()) {
+    sendError(link, attachmentError, "invalid_attachment");
+    return;
+  }
+  const Store::MessageOutcome outcome = store_.appendMessage(
+      roomId, userId, message["body"].asString(), attachment);
+  if (!outcome.ok) {
+    sendError(link, outcome.error);
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("message_new"));
+  payload.set("message", messageToJson(outcome.message));
+  hub_.sendToUsers(store_.roomMembers(roomId), payload);
+  sendRoomLists(roomId);
+}
+
+void Protocol::handleTyping(ClientLink* link, const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string roomId = message["roomId"].asString();
+  if (!requireRoomMember(link, userId, roomId)) return;
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("typing"));
+  payload.set("roomId", json::Value(roomId));
+  payload.set("userId", json::Value(userId));
+  payload.set("active", json::Value(message["active"].asBool()));
+  hub_.sendToUsers(store_.roomMembers(roomId), payload, userId);
+}
+
+void Protocol::handleCallInvite(ClientLink* link, const json::Value& message) {
+  std::string callerId;
+  if (!requireAuth(link, callerId)) return;
+  const std::string roomId = message["roomId"].asString();
+  if (!requireRoomMember(link, callerId, roomId)) return;
+
+  Room room;
+  if (!store_.findRoom(roomId, room) || !room.direct) {
+    sendError(link, "Calls are available in direct conversations.",
+              "invalid_call_room");
+    return;
+  }
+  std::string calleeId = message["calleeId"].asString();
+  if (calleeId.empty()) {
+    for (const std::string& memberId : room.members) {
+      if (memberId != callerId) calleeId = memberId;
+    }
+  }
+  if (!store_.isMember(roomId, calleeId)) {
+    sendError(link, "That person is not part of this conversation.");
+    return;
+  }
+  if (!hub_.isOnline(calleeId)) {
+    sendError(link, "That person is offline.", "user_offline");
+    return;
+  }
+
+  std::string callId;
+  std::string error;
+  const bool video = message["video"].asBool();
+  if (!hub_.startCall(callerId, calleeId, roomId, video, callId, error)) {
+    sendError(link, error, "call_unavailable");
+    return;
+  }
+  User caller;
+  store_.findUser(callerId, caller);
+  json::Value incoming = makeObject();
+  incoming.set("t", json::Value("call_incoming"));
+  incoming.set("callId", json::Value(callId));
+  incoming.set("roomId", json::Value(roomId));
+  incoming.set("video", json::Value(video));
+  incoming.set("caller", userToJson(caller));
+  hub_.sendToUser(calleeId, incoming);
+
+  json::Value ringing = makeObject();
+  ringing.set("t", json::Value("call_ringing"));
+  ringing.set("callId", json::Value(callId));
+  ringing.set("roomId", json::Value(roomId));
+  ringing.set("video", json::Value(video));
+  link->send(ringing);
+}
+
+void Protocol::handleCallAccept(ClientLink* link,
+                                const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string callId = message["callId"].asString();
+  std::string error;
+  if (!hub_.acceptCall(callId, userId, error)) {
+    sendError(link, error, "call_unavailable");
+    return;
+  }
+  std::string callerId;
+  std::string calleeId;
+  if (!hub_.callParticipants(callId, callerId, calleeId)) return;
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("call_accepted"));
+  payload.set("callId", json::Value(callId));
+  payload.set("calleeId", json::Value(userId));
+  hub_.sendToUser(callerId, payload);
+  link->send(payload);
+}
+
+void Protocol::handleCallDecline(ClientLink* link,
+                                 const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string callId = message["callId"].asString();
+  std::string otherUserId;
+  if (!hub_.endCall(callId, userId, otherUserId)) {
+    sendError(link, "That call has already ended.", "call_unavailable");
+    return;
+  }
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("call_ended"));
+  payload.set("callId", json::Value(callId));
+  payload.set("reason", json::Value("declined"));
+  hub_.sendToUser(otherUserId, payload);
+  link->send(payload);
+}
+
+void Protocol::handleCallSignal(ClientLink* link,
+                                const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string callId = message["callId"].asString();
+  std::string callerId;
+  std::string calleeId;
+  if (!hub_.callParticipants(callId, callerId, calleeId) ||
+      (callerId != userId && calleeId != userId)) {
+    sendError(link, "That call is no longer active.", "call_unavailable");
+    return;
+  }
+  const json::Value& signal = message["signal"];
+  if (!signal.isObject() || signal.dump().size() > 64u * 1024u) {
+    sendError(link, "That call signal is invalid.", "invalid_signal");
+    return;
+  }
+
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("call_signal"));
+  payload.set("callId", json::Value(callId));
+  payload.set("kind", json::Value(message["kind"].asString()));
+  payload.set("signal", signal);
+  hub_.sendToUser(callerId == userId ? calleeId : callerId, payload);
+}
+
+void Protocol::handleCallHangup(ClientLink* link,
+                                const json::Value& message) {
+  std::string userId;
+  if (!requireAuth(link, userId)) return;
+  const std::string callId = message["callId"].asString();
+  std::string otherUserId;
+  if (!hub_.endCall(callId, userId, otherUserId)) {
+    sendError(link, "That call has already ended.", "call_unavailable");
+    return;
+  }
+  json::Value payload = makeObject();
+  payload.set("t", json::Value("call_ended"));
+  payload.set("callId", json::Value(callId));
+  payload.set("reason", json::Value("hangup"));
+  hub_.sendToUser(otherUserId, payload);
+  link->send(payload);
+}
+
 void Protocol::handleText(ClientLink* link, const std::string& text) {
   json::Value message;
   std::string parseError;
@@ -251,6 +639,36 @@ void Protocol::handleText(ClientLink* link, const std::string& text) {
     handleResume(link, message);
   } else if (type == "logout") {
     handleLogout(link, message);
+  } else if (type == "bootstrap") {
+    handleBootstrap(link, message);
+  } else if (type == "directory") {
+    handleDirectory(link, message);
+  } else if (type == "profile_update") {
+    handleProfileUpdate(link, message);
+  } else if (type == "room_create") {
+    handleRoomCreate(link, message);
+  } else if (type == "room_open_direct") {
+    handleRoomOpenDirect(link, message);
+  } else if (type == "room_join") {
+    handleRoomJoin(link, message);
+  } else if (type == "room_leave") {
+    handleRoomLeave(link, message);
+  } else if (type == "history") {
+    handleHistory(link, message);
+  } else if (type == "message_send") {
+    handleMessageSend(link, message);
+  } else if (type == "typing") {
+    handleTyping(link, message);
+  } else if (type == "call_invite") {
+    handleCallInvite(link, message);
+  } else if (type == "call_accept") {
+    handleCallAccept(link, message);
+  } else if (type == "call_decline") {
+    handleCallDecline(link, message);
+  } else if (type == "call_signal") {
+    handleCallSignal(link, message);
+  } else if (type == "call_hangup") {
+    handleCallHangup(link, message);
   } else {
     sendError(link, "That message type is not available yet.",
               "unsupported_message");

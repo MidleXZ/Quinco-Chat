@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173c38">
+  <title>Quinco Chat</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1a3431;
+      --muted: #73817b;
+      --line: #dce4df;
+      --paper: #f5f7f3;
+      --white: #fff;
+      --pine: #173c38;
+      --pine-light: #285650;
+      --lime: #d6f36a;
+      --coral: #f1a88c;
+      --red: #a13d36;
+      --shadow: 0 22px 70px rgb(22 47 42 / 12%);
+      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    .auth-layout {
+      display: grid;
+      grid-template-columns: minmax(390px, 0.92fr) minmax(440px, 1.08fr);
+      min-height: 100vh;
+    }
+
+    .welcome-panel {
+      position: relative;
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: clamp(32px, 6vw, 82px);
+      color: #f4f6f0;
+      background-color: var(--pine);
+      background-image:
+        repeating-linear-gradient(132deg, transparent 0 62px, rgb(255 255 255 / 3%) 63px 64px),
+        repeating-linear-gradient(42deg, transparent 0 108px, rgb(255 255 255 / 2%) 109px 110px);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      width: fit-content;
+      color: inherit;
+      font-size: 16px;
+      font-weight: 750;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 11px 11px 11px 3px;
+      color: var(--pine);
+      background: var(--lime);
+      font-family: Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .welcome-copy {
+      position: relative;
+      z-index: 1;
+      max-width: 530px;
+      margin: 70px 0 48px;
+      animation: enter 650ms ease-out both;
+    }
+
+    .kicker {
+      margin: 0 0 20px;
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, p { margin-top: 0; }
+
+    .welcome-copy h1 {
+      max-width: 490px;
+      margin-bottom: 20px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(44px, 5vw, 70px);
+      font-weight: 400;
+      line-height: 0.99;
+    }
+
+    .welcome-copy > p {
+      max-width: 380px;
+      margin-bottom: 40px;
+      color: #c0d0c9;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .conversation {
+      width: min(100%, 380px);
+      padding: 19px 21px;
+      border: 1px solid rgb(255 255 255 / 14%);
+      border-radius: 4px 18px 18px 18px;
+      background: rgb(255 255 255 / 7%);
+      box-shadow: 0 18px 45px rgb(0 0 0 / 12%);
+      backdrop-filter: blur(5px);
+    }
+
+    .conversation-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      color: #d6e2dc;
+      font-size: 11px;
+    }
+
+    .conversation-top strong { color: white; font-size: 12px; }
+
+    .message-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .avatar {
+      display: grid;
+      width: 27px;
+      height: 27px;
+      flex: 0 0 27px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--ink);
+      background: var(--coral);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .avatar.alt { background: var(--lime); }
+
+    .bubble {
+      padding: 9px 12px;
+      border-radius: 3px 12px 12px 12px;
+      color: #f4f6f0;
+      background: rgb(255 255 255 / 10%);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .bubble.mine {
+      margin-left: auto;
+      border-radius: 12px 3px 12px 12px;
+      color: var(--ink);
+      background: var(--lime);
+    }
+
+    .welcome-foot {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #aebfb7;
+      font-size: 11px;
+    }
+
+    .welcome-foot::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--coral);
+      content: "";
+    }
+
+    .auth-panel {
+      display: grid;
+      min-height: 100vh;
+      place-items: center;
+      padding: 40px 28px;
+    }
+
+    .auth-card {
+      width: min(100%, 410px);
+      animation: enter 520ms 80ms ease-out both;
+    }
+
+    .mobile-brand { display: none; }
+
+    .connection {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      margin-bottom: 34px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d39352;
+      box-shadow: 0 0 0 3px rgb(211 147 82 / 14%);
+    }
+
+    .connection[data-state="connected"] .connection-dot {
+      background: #4c9a76;
+      box-shadow: 0 0 0 3px rgb(76 154 118 / 15%);
+    }
+
+    .connection[data-state="error"] .connection-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 3px rgb(161 61 54 / 12%);
+    }
+
+    .auth-heading h2 {
+      margin-bottom: 9px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+
+    .auth-heading p {
+      margin-bottom: 28px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 24px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eaf0eb;
+    }
+
+    .mode-switch button {
+      min-height: 39px;
+      border: 0;
+      border-radius: 5px;
+      color: #64746d;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .mode-switch button[aria-selected="true"] {
+      color: var(--ink);
+      background: white;
+      box-shadow: 0 1px 3px rgb(25 52 46 / 10%);
+    }
+
+    .field { margin-bottom: 17px; }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      color: #43534c;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      height: 48px;
+      padding: 0 13px;
+      border: 1px solid #ccd8d0;
+      border-radius: 6px;
+      outline: 0;
+      color: var(--ink);
+      background: rgb(255 255 255 / 78%);
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .field input::placeholder { color: #a1aca6; }
+    .field input:focus { border-color: #477e70; box-shadow: 0 0 0 3px rgb(71 126 112 / 13%); }
+
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 65px; }
+
+    .password-toggle {
+      position: absolute;
+      top: 50%;
+      right: 11px;
+      padding: 5px;
+      transform: translateY(-50%);
+      border: 0;
+      color: #65766e;
+      background: transparent;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .submit-button {
+      display: flex;
+      width: 100%;
+      min-height: 49px;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 7px;
+      border: 0;
+      border-radius: 6px;
+      color: white;
+      background: var(--pine);
+      font-size: 13px;
+      font-weight: 750;
+      transition: background 150ms ease, transform 150ms ease;
+    }
+
+    .submit-button:hover { transform: translateY(-1px); background: var(--pine-light); }
+    .submit-button:disabled { cursor: wait; opacity: 0.68; transform: none; }
+
+    .form-message {
+      min-height: 20px;
+      margin: 13px 0 0;
+      color: var(--red);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .form-message.success { color: #397655; }
+
+    .auth-note {
+      margin-top: 25px;
+      padding-top: 17px;
+      border-top: 1px solid var(--line);
+      color: #85918b;
+      font-size: 11px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .workspace {
+      display: grid;
+      min-height: 100vh;
+      grid-template-columns: 258px minmax(0, 1fr);
+      background: #fff;
+    }
+
+    .sidebar {
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      padding: 28px 19px 20px;
+      color: #eef3ed;
+      background: var(--pine);
+    }
+
+    .sidebar .brand { margin: 0 0 47px 4px; }
+
+    .side-label {
+      margin: 0 0 11px 9px;
+      color: #a5bab0;
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      min-height: 42px;
+      align-items: center;
+      gap: 11px;
+      padding: 0 11px;
+      border-radius: 5px;
+      color: #d0ddd5;
+      font-size: 13px;
+    }
+
+    .nav-item.active { color: var(--ink); background: var(--lime); font-weight: 750; }
+    .nav-glyph { width: 16px; text-align: center; font-size: 16px; }
+
+    .room-block { margin-top: 35px; }
+
+    .room-empty {
+      margin: 14px 8px;
+      color: #b3c3bb;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .room-actions { display: grid; gap: 6px; margin: 13px 0 22px; }
+
+    .room-action {
+      display: flex;
+      min-height: 36px;
+      align-items: center;
+      gap: 9px;
+      padding: 0 9px;
+      border: 1px solid rgb(255 255 255 / 13%);
+      border-radius: 5px;
+      color: #e0e9e3;
+      background: rgb(255 255 255 / 4%);
+      font-size: 11px;
+      text-align: left;
+    }
+
+    .room-action:hover { background: rgb(255 255 255 / 11%); }
+    .room-action span:first-child { color: var(--lime); font-size: 15px; }
+
+    .room-list { display: grid; gap: 3px; max-height: 36vh; overflow-y: auto; }
+
+    .room-row {
+      display: flex;
+      min-width: 0;
+      min-height: 39px;
+      align-items: center;
+      gap: 9px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 5px;
+      color: #d0ddd5;
+      background: transparent;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .room-row:hover, .room-row[aria-current="true"] { color: white; background: rgb(255 255 255 / 11%); }
+    .room-row-glyph { color: var(--lime); font-size: 15px; }
+    .room-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .sidebar-bottom { margin-top: auto; }
+
+    .account {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 7px 4px;
+      border-top: 1px solid rgb(255 255 255 / 15%);
+    }
+
+    .account-avatar {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--pine);
+      background: var(--coral);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .account-copy { min-width: 0; flex: 1; }
+    .account-name, .account-handle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-name { margin-bottom: 3px; font-size: 12px; font-weight: 700; }
+    .account-handle { color: #adc0b7; font-size: 10px; }
+
+    .signout-button {
+      padding: 7px;
+      border: 0;
+      border-radius: 4px;
+      color: #d2dfd8;
+      background: transparent;
+      font-size: 11px;
+    }
+
+    .signout-button:hover { color: white; background: rgb(255 255 255 / 10%); }
+
+    .main-panel {
+      display: flex;
+      min-width: 0;
+      min-height: 100vh;
+      flex-direction: column;
+      background: #fbfcfa;
+    }
+
+    .workspace-header {
+      display: flex;
+      min-height: 74px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 34px;
+      border-bottom: 1px solid #e7ece8;
+      background: #fff;
+    }
+
+    .workspace-title { margin: 0; font-family: Georgia, serif; font-size: 23px; font-weight: 400; }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+
+    .call-action {
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid #d6e1d9;
+      border-radius: 5px;
+      color: var(--pine);
+      background: white;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .call-action:hover { border-color: #91b4a2; background: #f0f6f1; }
+    .call-action[hidden] { display: none; }
+
+    .connected-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #65766e;
+      font-size: 11px;
+    }
+
+    .connected-label::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4c9a76;
+      content: "";
+    }
+
+    .welcome-state {
+      display: grid;
+      flex: 1;
+      place-items: center;
+      padding: 40px 24px;
+    }
+
+    .welcome-state-inner { width: min(100%, 570px); animation: enter 500ms ease-out both; }
+
+    .state-mark {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      margin-bottom: 25px;
+      place-items: center;
+      border-radius: 16px 16px 16px 5px;
+      color: var(--pine);
+      background: var(--lime);
+      font-family: Georgia, serif;
+      font-size: 28px;
+    }
+
+    .welcome-state h1 {
+      max-width: 540px;
+      margin-bottom: 13px;
+      font-family: Georgia, serif;
+      font-size: clamp(34px, 4vw, 49px);
+      font-weight: 400;
+      line-height: 1.06;
+    }
+
+    .welcome-state p {
+      max-width: 430px;
+      margin-bottom: 27px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .server-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      max-width: 485px;
+      padding: 15px 16px;
+      border-left: 3px solid #ecac8e;
+      color: #506159;
+      background: #f2f5f1;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .server-note strong { display: block; margin-bottom: 3px; color: var(--ink); }
+
+    .chat-view {
+      display: flex;
+      min-height: 0;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    .chat-view[hidden] { display: none; }
+
+    .message-list {
+      display: flex;
+      min-height: 0;
+      flex: 1;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      padding: 28px clamp(20px, 6vw, 86px);
+    }
+
+    .message-empty {
+      display: grid;
+      flex: 1;
+      place-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .message-item { display: flex; align-items: flex-start; gap: 11px; max-width: 760px; }
+
+    .message-avatar {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      flex: 0 0 31px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--ink);
+      background: var(--coral);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .message-content { min-width: 0; }
+    .message-meta { display: flex; align-items: baseline; gap: 8px; margin: 1px 0 5px; }
+    .message-author { color: var(--ink); font-size: 12px; font-weight: 750; }
+    .message-time { color: #89968f; font-size: 10px; }
+    .message-body { margin: 0; color: #3f5149; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+    .typing-line { min-height: 19px; padding: 0 clamp(20px, 6vw, 86px); color: #77867e; font-size: 11px; }
+
+    .composer-wrap { padding: 9px clamp(16px, 5vw, 70px) 22px; }
+
+    .composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 9px;
+      border: 1px solid #d8e2db;
+      border-radius: 7px;
+      background: white;
+      box-shadow: 0 3px 12px rgb(25 52 46 / 4%);
+    }
+
+    .composer textarea {
+      min-height: 40px;
+      max-height: 140px;
+      flex: 1;
+      resize: vertical;
+      padding: 10px 9px;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .composer textarea::placeholder { color: #9aa69f; }
+
+    .send-button {
+      min-width: 72px;
+      min-height: 38px;
+      border: 0;
+      border-radius: 5px;
+      color: white;
+      background: var(--pine);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .send-button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    dialog {
+      width: min(460px, calc(100vw - 32px));
+      max-height: min(80vh, 680px);
+      padding: 0;
+      overflow: auto;
+      border: 1px solid #d8e2db;
+      border-radius: 9px;
+      color: var(--ink);
+      background: white;
+      box-shadow: var(--shadow);
+    }
+
+    dialog::backdrop { background: rgb(15 35 31 / 46%); backdrop-filter: blur(3px); }
+
+    .dialog-content { padding: 24px; }
+    .dialog-content h2 { margin: 0 0 8px; font-family: Georgia, serif; font-size: 27px; font-weight: 400; }
+    .dialog-copy { margin: 0 0 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .dialog-actions button { min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; font-size: 12px; font-weight: 700; }
+    .dialog-actions .primary { border-color: var(--pine); color: white; background: var(--pine); }
+    .dialog-error { min-height: 18px; margin: 10px 0 0; color: var(--red); font-size: 11px; }
+
+    .discovery-list { display: grid; gap: 8px; }
+    .discovery-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px; border: 1px solid var(--line); border-radius: 5px; }
+    .discovery-name { min-width: 0; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 700; text-overflow: ellipsis; }
+    .discovery-meta { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .discovery-row button { min-height: 31px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; color: var(--pine); background: white; font-size: 10px; font-weight: 750; }
+
+    .call-dialog { width: min(560px, calc(100vw - 28px)); }
+    .call-content { padding: 23px; }
+    .call-status { margin: 7px 0 16px; color: var(--muted); font-size: 12px; }
+    .call-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .call-media video { width: 100%; min-height: 120px; aspect-ratio: 4 / 3; border-radius: 5px; background: #182d29; object-fit: cover; }
+    .call-media audio { display: none; }
+    .call-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 17px; }
+    .call-actions button { min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; font-size: 11px; font-weight: 750; }
+    .call-actions .accept { border-color: var(--pine); color: white; background: var(--pine); }
+    .call-actions .danger { border-color: #a13d36; color: white; background: #a13d36; }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 5;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 12px 15px;
+      border-radius: 5px;
+      color: white;
+      background: #273c36;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 780px) {
+      .auth-layout { display: block; }
+      .welcome-panel { display: none; }
+      .auth-panel { min-height: 100svh; padding: 28px 23px; }
+      .auth-card { width: min(100%, 430px); }
+      .mobile-brand { display: inline-flex; margin-bottom: 45px; color: var(--pine); }
+      .connection { margin-bottom: 28px; }
+      .workspace { grid-template-columns: 74px minmax(0, 1fr); }
+      .sidebar { align-items: center; padding: 22px 10px 14px; }
+      .sidebar .brand { margin: 0 0 42px; }
+      .sidebar .brand-name, .side-label, .nav-text, .room-empty,
+      .account-copy, .signout-button { display: none; }
+      .room-actions { margin-top: 25px; }
+      .room-action { width: 46px; justify-content: center; padding: 0; font-size: 0; }
+      .room-action span:first-child { font-size: 17px; }
+      .room-list { width: 46px; }
+      .room-row { width: 46px; justify-content: center; padding: 0; }
+      .room-row-name { display: none; }
+      .nav-item { width: 46px; justify-content: center; padding: 0; }
+      .room-block { margin-top: 25px; }
+      .account { justify-content: center; padding: 15px 0 0; }
+      .workspace-header { min-height: 64px; padding: 0 20px; }
+    }
+
+    @media (max-width: 460px) {
+      .auth-panel { padding: 24px 20px; }
+      .mobile-brand { margin-bottom: 34px; }
+      .auth-heading h2 { font-size: 34px; }
+      .workspace { grid-template-columns: 58px minmax(0, 1fr); }
+      .sidebar { padding-right: 6px; padding-left: 6px; }
+      .sidebar .brand-mark { width: 31px; height: 31px; }
+      .nav-item { width: 42px; }
+      .workspace-header { padding: 0 14px; }
+      .connected-label { font-size: 10px; }
+      .welcome-state { padding: 32px 20px; }
+      .call-action { min-height: 30px; padding: 0 6px; font-size: 10px; }
+      .message-list { padding: 20px 14px; }
+      .typing-line { padding: 0 14px; }
+      .composer-wrap { padding: 8px 10px 13px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main id="auth-view" class="auth-layout">
+    <section class="welcome-panel" aria-label="Quinco Chat">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">q</span><span>Quinco Chat</span></div>
+      <div class="welcome-copy">
+        <p class="kicker">Good conversations, kept close</p>
+        <h1>A little more room to be heard.</h1>
+        <p>Make space for the people and conversations you want to keep coming back to.</p>
+        <div class="conversation" aria-hidden="true">
+          <div class="conversation-top"><strong>Sunday plans</strong><span>3 people</span></div>
+          <div class="message-line"><span class="avatar">M</span><span class="bubble">Found a place by the water. 11:30?</span></div>
+          <div class="message-line"><span class="avatar alt">J</span><span class="bubble mine">Already saved it. See you there.</span></div>
+        </div>
+      </div>
+      <div class="welcome-foot">A quieter corner of the internet</div>
+    </section>
+
+    <section class="auth-panel" aria-labelledby="auth-title">
+      <div class="auth-card">
+        <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">q</span><span>Quinco Chat</span></div>
+        <div id="connection" class="connection" data-state="connecting" role="status">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connection-text">Connecting to your server</span>
+        </div>
+        <header class="auth-heading">
+          <h2 id="auth-title">Welcome back</h2>
+          <p id="auth-subtitle">Sign in to pick up where your conversations left off.</p>
+        </header>
+        <div class="mode-switch" role="tablist" aria-label="Account access">
+          <button id="login-tab" type="button" role="tab" aria-selected="true">Sign in</button>
+          <button id="register-tab" type="button" role="tab" aria-selected="false">Create account</button>
+        </div>
+        <form id="auth-form" novalidate>
+          <div id="display-name-field" class="field" hidden>
+            <label for="display-name">Display name</label>
+            <input id="display-name" name="displayName" type="text" maxlength="48" autocomplete="name" placeholder="How people will know you">
+          </div>
+          <div class="field">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9._\x2d]{3,24}" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourname" required>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="password-wrap">
+              <input id="password" name="password" type="password" minlength="8" maxlength="200" autocomplete="current-password" placeholder="At least 8 characters" required>
+              <button id="password-toggle" class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+            </div>
+          </div>
+          <button id="submit-button" class="submit-button" type="submit"><span id="submit-label">Sign in</span><span aria-hidden="true">&#8594;</span></button>
+          <p id="form-message" class="form-message" role="alert" aria-live="polite"></p>
+        </form>
+        <p class="auth-note">Your account is stored on the server you connected to.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="workspace" class="workspace" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">q</span><span class="brand-name">Quinco</span></div>
+      <p class="side-label">Workspace</p>
+      <div class="nav-item active" aria-current="page"><span class="nav-glyph" aria-hidden="true">&#9673;</span><span class="nav-text">Messages</span></div>
+      <div class="room-actions">
+        <button id="new-chat-button" class="room-action" type="button"><span aria-hidden="true">+</span><span>New conversation</span></button>
+        <button id="create-room-button" class="room-action" type="button"><span aria-hidden="true">&#9638;</span><span>Create room</span></button>
+        <button id="browse-rooms-button" class="room-action" type="button"><span aria-hidden="true">&#8981;</span><span>Browse rooms</span></button>
+      </div>
+      <section class="room-block" aria-label="Rooms">
+        <p class="side-label">Your rooms</p>
+        <p id="room-empty" class="room-empty">No rooms yet.</p>
+        <div id="room-list" class="room-list" aria-label="Conversations"></div>
+      </section>
+      <div class="sidebar-bottom">
+        <div class="account">
+          <span id="account-avatar" class="account-avatar" aria-hidden="true">Q</span>
+          <div class="account-copy">
+            <div id="account-name" class="account-name"></div>
+            <div id="account-handle" class="account-handle"></div>
+          </div>
+          <button id="signout-button" class="signout-button" type="button">Sign out</button>
+        </div>
+      </div>
+    </aside>
+    <main class="main-panel">
+      <header class="workspace-header">
+        <h1 id="workspace-title" class="workspace-title">Messages</h1>
+        <div class="header-actions">
+          <button id="audio-call-button" class="call-action" type="button" hidden>Audio call</button>
+          <button id="video-call-button" class="call-action" type="button" hidden>Video call</button>
+          <div id="workspace-connection" class="connected-label">Connected</div>
+        </div>
+      </header>
+      <section id="welcome-state" class="welcome-state" aria-labelledby="workspace-heading">
+        <div class="welcome-state-inner">
+          <div class="state-mark" aria-hidden="true">q</div>
+          <p class="kicker" style="color:#57796c">Your space</p>
+          <h1 id="workspace-heading">You’re in, <span id="welcome-name">friend</span>.</h1>
+          <p>Start a conversation with someone or make a room for your group.</p>
+          <div class="server-note">
+            <div><strong>Your conversations live here</strong>Messages are saved by this server and appear for everyone in the room.</div>
+          </div>
+        </div>
+      </section>
+      <section id="chat-view" class="chat-view" aria-label="Conversation" hidden>
+        <div id="message-list" class="message-list" aria-live="polite"></div>
+        <div id="typing-line" class="typing-line" aria-live="polite"></div>
+        <div class="composer-wrap">
+          <form id="composer" class="composer">
+            <textarea id="message-input" rows="1" maxlength="4000" placeholder="Write a message" aria-label="Write a message" required></textarea>
+            <button id="send-button" class="send-button" type="submit">Send</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="action-dialog">
+    <form id="action-form" class="dialog-content">
+      <h2 id="action-title"></h2>
+      <p id="action-copy" class="dialog-copy"></p>
+      <div id="action-field" class="field">
+        <label id="action-label" for="action-input"></label>
+        <input id="action-input" type="text" maxlength="48" required>
+      </div>
+      <p id="action-error" class="dialog-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="action-cancel" type="button">Cancel</button>
+        <button id="action-submit" class="primary" type="submit">Continue</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="browse-dialog">
+    <div class="dialog-content">
+      <h2>Find a room</h2>
+      <p class="dialog-copy">Join a public room and start talking with its members.</p>
+      <div id="discovery-list" class="discovery-list"></div>
+      <p id="browse-empty" class="dialog-copy" hidden>No public rooms to join right now.</p>
+      <p id="browse-error" class="dialog-error" role="alert"></p>
+      <div class="dialog-actions"><button id="browse-close" type="button">Done</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="call-dialog" class="call-dialog">
+    <div class="call-content">
+      <h2 id="call-title">Call</h2>
+      <p id="call-status" class="call-status"></p>
+      <div id="call-media" class="call-media" hidden>
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+        <audio id="remote-audio" autoplay></audio>
+      </div>
+      <div class="call-actions">
+        <button id="accept-call-button" class="accept" type="button" hidden>Answer</button>
+        <button id="decline-call-button" class="danger" type="button" hidden>Decline</button>
+        <button id="mute-call-button" type="button" hidden>Mute</button>
+        <button id="hangup-call-button" class="danger" type="button" hidden>End call</button>
+        <button id="close-call-button" type="button" hidden>Close</button>
+      </div>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="/app.js?v=2" defer></script>
+</body>
+</html>

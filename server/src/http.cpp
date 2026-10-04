@@ -19,7 +19,7 @@ namespace {
 
 constexpr const char* kServerName = "QuincoChat/1.0";
 
-bool isRegularFile(const std::string& path) {
+bool isRegularFilePath(const std::string& path) {
   std::error_code error;
   return std::filesystem::is_regular_file(path, error) && !error;
 }
@@ -529,19 +529,19 @@ bool StaticFiles::resolve(const std::string& urlPath, std::string& out) const {
 bool StaticFiles::isRegularFile(const std::string& urlPath) const {
   std::string full;
   if (!resolve(urlPath, full)) return false;
-  return quinco::http::isRegularFile(full);
+  return isRegularFilePath(full);
 }
 
 Response StaticFiles::serve(const std::string& urlPath,
                             const std::string& method,
                             const std::string& fallback) const {
   std::string full;
-  bool found = resolve(urlPath, full) && isRegularFile(full);
+  bool found = resolve(urlPath, full) && isRegularFilePath(full);
 
   // Client-side routes resolve to the SPA shell.
   if (!found && !fallback.empty() && fallback != urlPath) {
     std::string fallbackFull;
-    if (resolve(fallback, fallbackFull) && isRegularFile(fallbackFull)) {
+    if (resolve(fallback, fallbackFull) && isRegularFilePath(fallbackFull)) {
       full = fallbackFull;
       found = true;
     }
@@ -567,8 +567,11 @@ Response StaticFiles::serve(const std::string& urlPath,
   // The HTML shell must always be revalidated so a rebuilt bundle is picked
   // up immediately; everything else can sit in the cache briefly.
   const bool isDocument = response.contentType.rfind("text/html", 0) == 0;
-  response.headers["Cache-Control"] =
-      isDocument ? "no-cache" : "public, max-age=300";
+    const bool isClientCode =
+      response.contentType.rfind("text/javascript", 0) == 0;
+    response.headers["Cache-Control"] = isDocument || isClientCode
+                        ? "no-cache"
+                        : "public, max-age=300";
   return response;
 }
 

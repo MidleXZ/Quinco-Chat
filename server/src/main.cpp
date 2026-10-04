@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <mutex>
@@ -292,13 +293,44 @@ bool parsePort(const std::string& text, uint16_t& port) {
   return true;
 }
 
+std::string defaultWebDirectory(const char* executablePath) {
+  const char* appDirectory = std::getenv("APPDIR");
+  if (appDirectory && *appDirectory) {
+    const std::filesystem::path appWeb =
+        std::filesystem::path(appDirectory) / "usr/share/quinco-chat/public";
+    std::error_code error;
+    if (std::filesystem::is_directory(appWeb, error) && !error) {
+      return appWeb.string();
+    }
+  }
+
+  std::error_code error;
+  const std::filesystem::path executable =
+      std::filesystem::absolute(executablePath, error);
+  if (!error) {
+    const std::filesystem::path binaryDirectory = executable.parent_path();
+    const std::filesystem::path candidates[] = {
+        binaryDirectory / "../share/quinco-chat/public",
+        binaryDirectory / "public",
+        binaryDirectory.parent_path() / "public",
+        binaryDirectory.parent_path().parent_path() / "public"};
+    for (const std::filesystem::path& candidate : candidates) {
+      error.clear();
+      if (std::filesystem::is_directory(candidate, error) && !error) {
+        return candidate.lexically_normal().string();
+      }
+    }
+  }
+  return "public";
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   std::string host = "127.0.0.1";
   uint16_t port = 8080;
   std::string dataDirectory = "data";
-  std::string webDirectory = "public";
+  std::string webDirectory = defaultWebDirectory(argv[0]);
   for (int index = 1; index < argc; ++index) {
     const std::string argument = argv[index];
     if (argument == "--help" || argument == "-h") {
@@ -382,6 +414,7 @@ int main(int argc, char** argv) {
   std::vector<std::thread> workers;
   std::cout << "Quinco Chat listening on http://" << host << ':' << port
             << " (WebSocket: /ws, health: /health)\n";
+  std::cout << "Serving web files from " << webDirectory << '\n';
   while (!g_stopping) {
     fd_set readable;
     FD_ZERO(&readable);
